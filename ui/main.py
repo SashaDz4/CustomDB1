@@ -1,5 +1,6 @@
 import PySimpleGUI as sg
 from datetime import datetime
+from interval import Interval
 
 from models import column
 from models.db_manager import DBManager
@@ -8,7 +9,6 @@ from ui.views import (
     add_table_view,
     add_column_view,
     add_row_view,
-    enum_column_view,
     delete_row_view,
     delete_table_view,
     change_row_view,
@@ -24,13 +24,13 @@ sg.theme("BluePurple")
 layout = [
     [sg.Button("Create DB"), sg.Button("Open DB"), sg.Button("Save DB")],
     [
-        sg.Text("Current DB:"),
+        sg.Text("Current DB:", text_color="black"),
         sg.Text(key="-CURRENT-DB-"),
         sg.Text(key="-ERRORS-", text_color="red"),
     ],
     [
-        sg.Text("Tables:"),
-        sg.Text("Data:", pad=((70, 0), (0, 0))),
+        sg.Text("Tables:", text_color="black"),
+        sg.Text("Data:", pad=((70, 0), (0, 0)), text_color="black"),
         sg.Button("Add Column", pad=((100, 0), (0, 0))),
         sg.Push(),
         sg.Button("Change Column"),
@@ -49,6 +49,10 @@ layout = [
 ]
 
 
+def parse_time(val):
+    return datetime.strptime(val, column.TimeCol.FORMAT).time()
+
+
 def parse_value(val, type_: str):
     if type_ == "int":
         return int(val)
@@ -57,12 +61,12 @@ def parse_value(val, type_: str):
     elif type_ == "char":
         return val[0]
     elif type_ == "time":
-        return datetime.strptime(val, "%H:%M:%S").time()
+        return parse_time(val)
     return val
 
 
 DB_MANAGER = DBManager()
-LOCAL_DATA = {"selected_table": None}
+LOCAL_DATA = {"selected_table": ""}
 
 window = sg.Window("DBMS", layout)
 
@@ -96,7 +100,6 @@ while True:
                 table_name=LOCAL_DATA["selected_table"],
             )
             if event == "OK":
-                new_column = None
                 column_type = values["-COLUMN-TYPE-"]
                 one_input_columns = {
                     "int": column.IntCol,
@@ -104,32 +107,10 @@ while True:
                     "char": column.CharCol,
                     "string": column.StringCol,
                     "time": column.TimeCol,
+                    "time interval": column.TimeIntervalCol,
                 }
 
-                if column_type in one_input_columns:
-                    new_column = one_input_columns[column_type](values["-COLUMN-NAME-"])
-                elif column_type == "enum":
-                    enum_event, enum_values = enum_column_view(
-                        values["-COLUMN-NAME-"], list(one_input_columns)
-                    )
-                    if enum_event == "OK":
-                        new_column_type = enum_values["-COLUMN-TYPE-"]
-                        # prepare available_values:
-                        available_values = enum_values["-AVAILABLE-VALUES-"].split(";")
-                        for index, value in enumerate(available_values):
-                            available_values[index] = parse_value(
-                                value, new_column_type
-                            )
-
-                        new_column = column.EnumCol(
-                            name=values["-COLUMN-NAME-"],
-                            column_type=enum_values["-COLUMN-TYPE-"],
-                            available_values=available_values,
-                            default=parse_value(
-                                enum_values["-DEFAULT-VALUE-"], new_column_type
-                            ),
-                        )
-
+                new_column = one_input_columns[column_type](values["-COLUMN-NAME-"])
                 DB_MANAGER.add_column(values["-TABLE-NAME-"], new_column)
                 LOCAL_DATA["selected_table"] = values["-TABLE-NAME-"]
 
@@ -141,11 +122,17 @@ while True:
             if event == "OK":
                 # prepare data
                 for column_name in list(values):
-                    correct_column_name = column_name.split(":")[0]
-                    col = table.get_column_by_name(correct_column_name)
-                    values[correct_column_name] = parse_value(
-                        values.pop(column_name), col.type
-                    )
+                    correct_column_name = column_name.split(": ")[0]
+                    if column_name.split(": ")[1][:-2] == "time interval":
+                        if column_name.split(": ")[1][-1] == "2":
+                            continue
+                        start, end = parse_time(values.pop(column_name)), parse_time(values.pop(column_name[:-1] + "2"))
+                        values[correct_column_name] = Interval(start, end)
+                    else:
+                        col = table.get_column_by_name(correct_column_name)
+                        values[correct_column_name] = parse_value(
+                            values.pop(column_name), col.type
+                        )
 
                 DB_MANAGER.add_row(table_name=table.name, data=values)
 

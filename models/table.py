@@ -1,5 +1,6 @@
 from __future__ import annotations
 from Pyro5.api import expose
+from interval import Interval
 
 from typing import Any
 
@@ -47,9 +48,14 @@ class Table:
     def _str_columns_and_rows(self) -> str:
         if len(self._columns) == 0:
             return ""
-
+        rows = [
+            [
+                f"{value.lower_bound} - {value.upper_bound}" if isinstance(value, Interval) else value for value in row
+            ]
+            for row in self.rows
+        ]
         return tabulate(
-            self.rows,
+            rows,
             self.columns,
             tablefmt="orgtbl",
         )

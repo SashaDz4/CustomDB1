@@ -6,9 +6,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 from datetime import datetime
+from interval import Interval
 
 
-COLUMN_TYPE_CHOICES = ["int", "real", "char", "string", "time", "enum"]
+COLUMN_TYPE_CHOICES = ["int", "real", "char", "string", "time", "time interval"]
 
 
 @expose
@@ -98,7 +99,8 @@ class StringCol(Column):
 @expose
 class TimeCol(Column):
     TYPE = "time"
-    DEFAULT = datetime.strptime("00:00:00", "%H:%M:%S").time()
+    FORMAT = "%H:%M:%S"
+    DEFAULT = datetime.strptime("00:00:00", FORMAT).time()
 
     def __init__(self, name: str, default: str = DEFAULT) -> None:
         super().__init__(TimeCol.TYPE, name, default)
@@ -109,41 +111,16 @@ class TimeCol(Column):
 
 
 @expose
-class EnumCol(Column):
-    TYPE = "enum"
+class TimeIntervalCol(Column):
+    TYPE = "time interval"
+    DEFAULT = Interval(
+        datetime.strptime("00:00:00", TimeCol.FORMAT).time(),
+        datetime.strptime("12:00:00", TimeCol.FORMAT).time()
+    )
 
-    COLUMN_TYPE_CLASS = {  # this should be frozen dict
-        "int": IntCol,
-        "real": RealCol,
-        "char": CharCol,
-        "string": StringCol,
-    }
+    def __init__(self, name: str, default: str = DEFAULT) -> None:
+        super().__init__(TimeIntervalCol.TYPE, name, default)
 
-    def __init__(
-        self, name: str, column_type: str, available_values: tuple, default: Any = None
-    ) -> None:
-        if len(available_values) == 0:
-            raise ValueError("Available values for enum cannot be empty!")
-
-        if default is None:
-            default = available_values[0]
-
-        if column_type not in EnumCol.COLUMN_TYPE_CLASS.keys():
-            raise TypeError(
-                f"Type '{column_type}' is not supported for enum! Please use one of {tuple(EnumCol.COLUMN_TYPE_CLASS)}"
-            )
-
-        type_class: Column = EnumCol.COLUMN_TYPE_CLASS[column_type]
-
-        for value in available_values:
-            if not type_class.validate(value):
-                raise ValueError(
-                    f"Value '{value}' does not pass validation for '{column_type}' type"
-                )
-
-        self.available_values = available_values
-        self.type_class = type_class
-        super().__init__(column_type, name, default)
-
-    def validate(self, value) -> bool:
-        return value in self.available_values and self.type_class.validate(value)
+    @staticmethod
+    def validate(value) -> bool:
+        return isinstance(value, Interval)
