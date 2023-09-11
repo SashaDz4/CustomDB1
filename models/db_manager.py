@@ -60,9 +60,9 @@ class DBManager:
         table = self.get_table(table_name)
         return table.delete_row(index)
 
-    def save_database(self, path_to_save: str = None) -> str:
-        if path_to_save is None:
-            path_to_save = f"{self.db.name}.pickle"
+    def save_database(self, path_to_save: str = "") -> str:
+        if path_to_save == "":
+            path_to_save = f"{self.db.name}.pkl"
 
         with open(path_to_save, "wb") as file:
             pickle.dump(self.db, file)
