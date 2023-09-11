@@ -56,11 +56,11 @@ class Table:
         ]
         return tabulate(
             rows,
-            self.columns,
-            tablefmt="orgtbl",
+            headers=self.columns,
+            tablefmt="grid",
         )
 
-    def _get_column_names(self) -> tuple[str]:
+    def _get_column_names(self) -> tuple[Any, ...]:
         return tuple(column.name for column in self._columns)
 
     def _check_column_name_already_exists(self, new_column_name: str) -> bool:
@@ -132,19 +132,22 @@ class Table:
             column_index = self._get_column_names().index(column_name)
             row[column_index] = new_column_value
 
+    def remap_items(self, items, new_order: list[int]) -> list:
+        pairs = sorted([(items[i], idx) for i, idx in enumerate(new_order)], key=lambda x: x[1])
+        return [pair[0] for pair in pairs]
+
     def change_columns(self, new_order: list[int]) -> Table:
         if len(set(new_order)) != len(self._columns):
             raise ValueError(
-                f"New order should contain {len(self._columns)} elements!"
+                f"New order should contain {len(self._columns)} different elements!"
             )
         if max(new_order) >= len(self._columns) or min(new_order) < 0:
             raise ValueError(
                 f"New order should contain values from 1 to {len(self._columns)}!"
             )
-        new_order = [index + 1 if index != len(self._columns) - 1 else 0 for index in new_order]
         for row in self._rows:
-            row._values = [row[index] for index in new_order]
-        self._columns = [self._columns[index] for index in new_order]
+            row._values = self.remap_items(row, new_order)
+        self._columns = self.remap_items(self._columns, new_order)
         return self
 
     def rename_column(self, old_name: str, new_name: str) -> Table:
