@@ -57,7 +57,7 @@ class Table:
         return tabulate(
             rows,
             headers=self.columns,
-            tablefmt="grid",
+            tablefmt="orgtbl",
         )
 
     def _get_column_names(self) -> tuple[Any, ...]:
